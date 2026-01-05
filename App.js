@@ -1,7 +1,6 @@
-// App.js
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, Button, Image, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, Button, Image, StyleSheet, ScrollView, TouchableOpacity, TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -16,6 +15,7 @@ const layoutOptions = [
   { label: '6 Passport (2x2 inch)', value: '2x2_6' },
   { label: 'Multi A4 (2/4/6/9/12)', value: 'multi_a4' },
   { label: 'Aadhar Card (Top & Bottom)', value: 'aadhar' },
+  { label: 'Custom CM Size', value: 'custom' }, // New Option
 ];
 
 const photoCounts = [2, 4, 6, 9, 12];
@@ -29,6 +29,11 @@ export default function App() {
   const [multiImages, setMultiImages] = useState([]);
   const [aadharImageTop, setAadharImageTop] = useState(null);
   const [aadharImageBottom, setAadharImageBottom] = useState(null);
+  
+  // Custom Size States (in CM)
+  const [customWidth, setCustomWidth] = useState('3.5');
+  const [customHeight, setCustomHeight] = useState('4.5');
+  
   const layoutRef = useRef();
 
   const pickImage = async () => {
@@ -62,7 +67,7 @@ export default function App() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [3, 4],
+        aspect: layout === 'custom' ? undefined : [3, 4], // Flexibility for custom
         quality: 1,
       });
 
@@ -86,7 +91,7 @@ export default function App() {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
-        width: 1200,
+        width: 1200, // Higher width for print quality
         height: 1700,
       });
       await Sharing.shareAsync(uri);
@@ -100,6 +105,24 @@ export default function App() {
     if (layout !== 'multi_a4' && layout !== 'aadhar' && !brightImage) return null;
 
     switch (layout) {
+      case 'custom':
+        // 1cm = ~118 pixels at 300DPI for print quality
+        const pxWidth = parseFloat(customWidth || 0) * 118;
+        const pxHeight = parseFloat(customHeight || 0) * 118;
+        return (
+          <View style={styles.a4Container} ref={layoutRef} collapsable={false}>
+            <View style={{
+              width: pxWidth,
+              height: pxHeight,
+              borderWidth: 1,
+              borderColor: '#000',
+              overflow: 'hidden'
+            }}>
+              <Image source={{ uri: brightImage }} style={[styles.photo, { opacity: brightness }]} />
+            </View>
+            <Text style={{marginTop: 10, color: '#888'}}>{customWidth}cm x {customHeight}cm</Text>
+          </View>
+        );
       case '4x6_9':
         return (
           <View style={styles.layoutContainer} ref={layoutRef} collapsable={false}>
@@ -156,16 +179,16 @@ export default function App() {
           </View>
         );
       case 'aadhar':
-  return (
-    <View style={styles.a4Container} ref={layoutRef} collapsable={false}>
-      <View style={{ marginBottom: 10 }}>
-        <Image source={{ uri: aadharImageTop }} style={{ width: 320, height: 190, resizeMode: 'cover', borderWidth: 1, borderColor: '#000' }} />
-      </View>
-      <View>
-        <Image source={{ uri: aadharImageBottom }} style={{ width: 320, height: 190, resizeMode: 'cover', borderWidth: 1, borderColor: '#000' }} />
-      </View>
-    </View>
-  );
+        return (
+          <View style={styles.a4Container} ref={layoutRef} collapsable={false}>
+            <View style={{ marginBottom: 10 }}>
+              <Image source={{ uri: aadharImageTop }} style={{ width: 320, height: 190, resizeMode: 'cover', borderWidth: 1, borderColor: '#000' }} />
+            </View>
+            <View>
+              <Image source={{ uri: aadharImageBottom }} style={{ width: 320, height: 190, resizeMode: 'cover', borderWidth: 1, borderColor: '#000' }} />
+            </View>
+          </View>
+        );
       default:
         return null;
     }
@@ -173,7 +196,7 @@ export default function App() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f0f4f7' }}>
-      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 120 }]}>
         <Text style={styles.title}>📸 Passport Photo Print App</Text>
 
         <Button title="Select Photo(s)" onPress={pickImage} />
@@ -197,10 +220,36 @@ export default function App() {
           ))}
         </View>
 
+        {/* Custom Size Inputs */}
+        {layout === 'custom' && (
+          <View style={styles.customInputContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Width (cm)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={customWidth}
+                onChangeText={setCustomWidth}
+                placeholder="3.5"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Height (cm)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={customHeight}
+                onChangeText={setCustomHeight}
+                placeholder="4.5"
+              />
+            </View>
+          </View>
+        )}
+
         {layout === 'multi_a4' && (
           <View style={styles.multiSelector}>
             <Text style={{ fontSize: 16, marginBottom: 6 }}>Select number of photos:</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               {photoCounts.map((count) => (
                 <TouchableOpacity
                   key={count}
@@ -216,12 +265,12 @@ export default function App() {
                   <Text style={{ color: '#fff' }}>{count}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </div>
           </View>
         )}
 
         {layout !== 'multi_a4' && layout !== 'aadhar' && image && (
-          <View style={{ width: '100%', alignItems: 'center' }}>
+          <View style={{ width: '100%', alignItems: 'center', marginTop: 15 }}>
             <Text style={{ fontSize: 16, marginBottom: 4 }}>Adjust Brightness:</Text>
             <Slider
               style={{ width: '80%', height: 40 }}
@@ -236,7 +285,10 @@ export default function App() {
         )}
 
         <Text style={styles.previewLabel}>Preview:</Text>
-        {renderLayout()}
+        <View style={{ transform: [{ scale: 0.5 }] }}> 
+            {/* Scale preview down so it fits on mobile screen while keeping export size large */}
+            {renderLayout()}
+        </View>
       </ScrollView>
 
       {(image || multiImages.length > 0 || (aadharImageTop && aadharImageBottom)) && (
@@ -267,6 +319,30 @@ const styles = StyleSheet.create({
   selectedBtn: { backgroundColor: '#00bcd4' },
   optionText: { color: '#000', fontWeight: '500' },
   previewLabel: { fontSize: 18, marginTop: 10 },
+  
+  // Custom Input Styles
+  customInputContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '90%',
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 12,
+    elevation: 3,
+    marginBottom: 10,
+  },
+  inputGroup: { alignItems: 'center', flex: 1 },
+  inputLabel: { fontSize: 12, color: '#666', marginBottom: 5 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#00bcd4',
+    borderRadius: 6,
+    width: '80%',
+    padding: 8,
+    textAlign: 'center',
+    fontSize: 16,
+  },
+
   layoutContainer: {
     width: 358,
     height: 540,
@@ -323,15 +399,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   shareBtnWrapper: {
-    padding: 10,
+    padding: 20,
     borderTopWidth: 1,
     borderColor: '#ccc',
     backgroundColor: '#fff',
     position: 'absolute',
-    bottom: 40,
+    bottom: 0,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
-  
 });
